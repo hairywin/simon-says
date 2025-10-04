@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8" />
-<meta name="viewport" content="width=device-width,initial-scale=1" />
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
 <title>Simon Says — Strict</title>
 <style>
   :root{
@@ -12,16 +12,49 @@
   }
   *{box-sizing:border-box}
   body{
-    margin:0; min-height:100svh; display:grid; place-items:center;
+    margin:0;
+    min-height:100dvh;
+    display:grid;
+    place-content:center;
+    gap:16px;
     font:500 16px/1.4 system-ui,-apple-system,Segoe UI,Roboto,Inter,Arial,sans-serif;
     background:radial-gradient(1200px 900px at 50% -20%, #1f2937 0%, #0b1020 55%, #060913 100%);
-    color:var(--ink); padding:24px;
+    color:var(--ink);
+    /* Safe-area friendly padding for iOS notches */
+    padding: max(16px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) max(16px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
   }
-  .wrap{width:min(520px, 96vw)}
-  h1{margin:0 0 16px; font-size:20px; font-weight:700; letter-spacing:.3px}
+  .wrap{
+    width:min(560px, 96vw);
+    margin-inline:auto;
+    display:grid;
+    gap:12px;
+  }
+  h1{margin:0; font-size:20px; font-weight:700; letter-spacing:.3px; text-align:center}
+
+  .hud{
+    display:flex; align-items:center; justify-content:space-between;
+    gap:10px; flex-wrap:wrap;
+  }
+  .left, .right{display:flex; align-items:center; gap:12px; flex-wrap:wrap}
+  .stat{
+    padding:10px 12px; border-radius:12px; background:#0b1224;
+    color:var(--ink); min-width:110px; text-align:center;
+  }
+  .stat small{display:block; color:var(--muted); font-weight:600; letter-spacing:.2px}
+  .btn{
+    appearance:none; border:none; border-radius:12px; padding:10px 14px;
+    background:linear-gradient(180deg, #0ea5e9, #0284c7); color:white; font-weight:700;
+    cursor:pointer; box-shadow:0 10px 18px rgba(2,132,199,.35); transition:transform .08s ease, filter .08s ease;
+  }
+  .btn:active{transform:translateY(1px)}
+
   .board{
+    /* Square board scales to the smaller viewport dimension on phones */
+    width:min(520px, 92vmin);
+    margin-inline:auto;
+    aspect-ratio:1 / 1;
     display:grid; grid-template-columns:repeat(2,1fr); gap:12px;
-    width:100%; aspect-ratio:1 / 1; border-radius:20px; padding:12px;
+    border-radius:20px; padding:12px;
     background:#0b1224; box-shadow:0 20px 60px rgba(0,0,0,.45) inset, 0 10px 30px rgba(0,0,0,.35);
   }
   .pad{
@@ -36,28 +69,17 @@
   .r{background:linear-gradient(180deg, var(--r), #a31818)}
   .y{background:linear-gradient(180deg, var(--y), #916a05)}
   .b{background:linear-gradient(180deg, var(--b), #1b48b1)}
-
   .pad.lit.g{background:linear-gradient(180deg, var(--g-lit), #16a34a); box-shadow:0 0 24px 8px rgba(52,211,153,.55), inset 0 0 0 3px rgba(255,255,255,.12)}
   .pad.lit.r{background:linear-gradient(180deg, var(--r-lit), #dc2626); box-shadow:0 0 24px 8px rgba(248,113,113,.55), inset 0 0 0 3px rgba(255,255,255,.12)}
   .pad.lit.y{background:linear-gradient(180deg, var(--y-lit), #ca8a04); box-shadow:0 0 24px 8px rgba(250,204,21,.55), inset 0 0 0 3px rgba(255,255,255,.12)}
   .pad.lit.b{background:linear-gradient(180deg, var(--b-lit), #2563eb); box-shadow:0 0 24px 8px rgba(96,165,250,.55), inset 0 0 0 3px rgba(255,255,255,.12)}
-  .hud{
-    display:flex; align-items:center; justify-content:space-between;
-    gap:10px; padding:14px 0 6px;
+
+  .msg{margin-top:2px; color:var(--muted); min-height:20px; text-align:center}
+
+  @media (max-width:480px){
+    .stat{min-width:96px; padding:8px 10px}
+    .board{gap:10px; padding:10px; width:min(520px, 94vmin)}
   }
-  .left, .right{display:flex; align-items:center; gap:12px; flex-wrap:wrap}
-  .stat{
-    padding:10px 12px; border-radius:12px; background:#0b1224;
-    color:var(--ink); min-width:110px; text-align:center;
-  }
-  .stat small{display:block; color:var(--muted); font-weight:600; letter-spacing:.2px}
-  .btn{
-    appearance:none; border:none; border-radius:12px; padding:10px 14px;
-    background:linear-gradient(180deg, #0ea5e9, #0284c7); color:white; font-weight:700;
-    cursor:pointer; box-shadow:0 10px 18px rgba(2,132,199,.35); transition:transform .08s ease, filter .08s ease;
-  }
-  .btn:active{transform:translateY(1px)}
-  .msg{margin-top:10px; color:var(--muted); min-height:20px}
 </style>
 </head>
 <body>
@@ -66,7 +88,7 @@
 
     <div class="hud">
       <div class="left">
-        <button id="restart" class="btn">Restart</button>
+        <button id="startRestart" class="btn" aria-live="polite">Start</button>
       </div>
       <div class="right">
         <div class="stat"><small>Round</small><span id="round">0</span></div>
@@ -81,13 +103,13 @@
       <button class="pad b" id="p3" data-id="3" aria-label="Blue"></button>
     </div>
 
-    <div class="msg" id="msg">Press Restart to begin. Strict mode is always on.</div>
+    <div class="msg" id="msg">Press Start to begin. Strict mode is always on.</div>
   </div>
 
 <script>
 (() => {
   const pads = [...document.querySelectorAll('.pad')];
-  const restartBtn = document.getElementById('restart');
+  const btn = document.getElementById('startRestart');
   const roundEl = document.getElementById('round');
   const scoreEl = document.getElementById('score');
   const msgEl = document.getElementById('msg');
@@ -97,10 +119,18 @@
   let acceptingInput = false;
   let sessionId = 0;
   let best = 0;
+  let hasStartedOnce = false;
 
   const AC = window.AudioContext || window.webkitAudioContext;
   const ctx = AC ? new AC() : null;
   const tones = [329.63, 261.63, 220.00, 196.00];
+
+  function setButtonStarted(){
+    if (!hasStartedOnce){
+      hasStartedOnce = true;
+      btn.textContent = 'Restart';
+    }
+  }
 
   function beep(idx, dur = 420, vol = 0.2) {
     if (!ctx) return;
@@ -158,10 +188,14 @@
     if (!keepBest) best = 0;
     updateRound(); updateScore();
     setPadsDisabled(true);
-    msgEl.textContent = 'Press Restart to begin. Strict mode is always on.';
+    msgEl.textContent = hasStartedOnce ? 'Press Restart to play again.' : 'Press Start to begin. Strict mode is always on.';
+    if (!hasStartedOnce) btn.textContent = 'Start';
   }
 
   async function startGame(){
+    // Make sure audio is unlocked on first gesture (iOS)
+    if (ctx && ctx.state === 'suspended') { try { await ctx.resume(); } catch(e){} }
+    setButtonStarted();
     sessionId++;
     stepIndex = 0;
     sequence = [];
@@ -190,7 +224,7 @@
     }
     await sleep(380);
     pads.forEach(p => p.classList.remove('lit'));
-    await startGame(); // strict always
+    await startGame(); // strict always restarts
   }
 
   async function handlePadPress(idx){
@@ -217,8 +251,9 @@
       if (e.key === 'Enter' || e.key === ' '){ e.preventDefault(); handlePadPress(Number(p.dataset.id)); }
     });
   });
-  document.getElementById('restart').addEventListener('click', startGame);
+  btn.addEventListener('click', startGame);
 
+  // Initial state
   resetGame(false);
 })();
 </script>
