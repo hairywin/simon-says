@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Simon Says</title>
+<style>
+  :root{
+    --bg:#0f172a; --ink:#e5e7eb; --muted:#94a3b8; --accent:#22d3ee;
+    --g:#16a34a; --r:#dc2626; --y:#ca8a04; --b:#2563eb;
+    --g-lit:#34d399; --r-lit:#f87171; --y-lit:#facc15; --b-lit:#60a5fa;
+  }
+  *{box-sizing:border-box}
+  body{
+    margin:0; min-height:100svh; display:grid; place-items:center;
+    font:500 16px/1.4 system-ui, -apple-system, Segoe UI, Roboto, Inter, Arial, sans-serif;
+    background:radial-gradient(1200px 900px at 50% -20%, #1f2937 0%, #0b1020 55%, #060913 100%);
+    color:var(--ink); padding:24px;
+  }
+  .wrap{width:min(520px, 96vw)}
+  h1{margin:0 0 16px; font-size:20px; font-weight:700; letter-spacing:.3px}
+  .board{
+    display:grid; grid-template-columns:repeat(2,1fr); gap:12px;
+    width:100%; aspect-ratio:1 / 1; border-radius:20px; padding:12px;
+    background:#0b1224; box-shadow:0 20px 60px rgba(0,0,0,.45) inset, 0 10px 30px rgba(0,0,0,.35);
+  }
+  .pad{
+    border-radius:18px; cursor:pointer; user-select:none; touch-action:manipulation;
+    box-shadow:inset 0 0 0 3px rgba(255,255,255,.06), 0 10px 18px rgba(0,0,0,.35);
+    transition:transform .08s ease, filter .08s ease, box-shadow .08s ease;
+    position:relative; isolation:isolate;
+  }
+  .pad:active{transform:scale(.98)}
+  .pad.disabled{pointer-events:none; filter:saturate(.6) brightness(.8)}
+  .g{background:linear-gradient(180deg, var(--g), #0e7a35)}
+  .r{background:linear-gradient(180deg, var(--r), #a31818)}
+  .y{background:linear-gradient(180deg, var(--y), #916a05)}
+  .b{background:linear-gradient(180deg, var(--b), #1b48b1)}
+
+  .pad.lit.g{background:linear-gradient(180deg, var(--g-lit), #16a34a); box-shadow:0 0 24px 8px rgba(52,211,153,.55), inset 0 0 0 3px rgba(255,255,255,.12)}
+  .pad.lit.r{background:linear-gradient(180deg, var(--r-lit), #dc2626); box-shadow:0 0 24px 8px rgba(248,113,113,.55), inset 0 0 0 3px rgba(255,255,255,.12)}
+  .pad.lit.y{background:linear-gradient(180deg, var(--y-lit), #ca8a04); box-shadow:0 0 24px 8px rgba(250,204,21,.55), inset 0 0 0 3px rgba(255,255,255,.12)}
+  .pad.lit.b{background:linear-gradient(180deg, var(--b-lit), #2563eb); box-shadow:0 0 24px 8px rgba(96,165,250,.55), inset 0 0 0 3px rgba(255,255,255,.12)}
+  .hud{
+    display:flex; align-items:center; justify-content:space-between;
+    gap:10px; padding:14px 0 6px;
+  }
+  .left, .right{display:flex; align-items:center; gap:12px; flex-wrap:wrap}
+  .stat{
+    padding:10px 12px; border-radius:12px; background:#0b1224;
+    color:var(--ink); min-width:110px; text-align:center;
+  }
+  .stat small{display:block; color:var(--muted); font-weight:600; letter-spacing:.2px}
+  .btn{
+    appearance:none; border:none; border-radius:12px; padding:10px 14px;
+    background:linear-gradient(180deg, #0ea5e9, #0284c7); color:white; font-weight:700;
+    cursor:pointer; box-shadow:0 10px 18px rgba(2,132,199,.35); transition:transform .08s ease, filter .08s ease;
+  }
+  .btn:active{transform:translateY(1px)}
+  .toggle{
+    display:inline-flex; align-items:center; gap:8px; background:#0b1224; padding:8px 10px; border-radius:12px;
+  }
+  input[type="checkbox"]{width:18px; height:18px; accent-color:var(--accent); cursor:pointer}
+  .msg{margin-top:10px; color:var(--muted); min-height:20px}
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>Simon Says</h1>
+
+    <div class="hud">
+      <div class="left">
+        <button id="restart" class="btn">Restart</button>
+        <label class="toggle"><input id="strict" type="checkbox" /> Strict mode</label>
+      </div>
+      <div class="right">
+        <div class="stat"><small>Round</small><span id="round">0</span></div>
+        <div class="stat"><small>Score (Longest)</small><span id="score">0</span></div>
+      </div>
+    </div>
+
+    <div class="board" id="board" aria-label="Game board">
+      <button class="pad g" id="p0" data-id="0" aria-label="Green"></button>
+      <button class="pad r" id="p1" data-id="1" aria-label="Red"></button>
+      <button class="pad y" id="p2" data-id="2" aria-label="Yellow"></button>
+      <button class="pad b" id="p3" data-id="3" aria-label="Blue"></button>
+    </div>
+
+    <div class="msg" id="msg">Press Restart to begin.</div>
+  </div>
+
+<script>
+(() => {
+  // Elements
+  const pads = [...document.querySelectorAll('.pad')];
+  const board = document.getElementById('board');
+  const restartBtn = document.getElementById('restart');
+  const strictChk = document.getElementById('strict');
+  const roundEl = document.getElementById('round');
+  const scoreEl = document.getElementById('score');
+  const msgEl = document.getElementById('msg');
+
+  // Game state
+  let sequence = [];
+  let stepIndex = 0;
+  let acceptingInput = false;
+  let sessionId = 0; // cancels pending playback when incremented
+  let best = 0;
+
+  // Audio (simple WebAudio beeps)
+  const AC = window.AudioContext || window.webkitAudioContext;
+  const ctx = AC ? new AC() : null;
+  const tones = [329.63, 261.63, 220.00, 196.00]; // E4, C4, A3, G3
+
+  function beep(idx, dur = 420, vol = 0.2) {
+    if (!ctx) return;
+    const o = ctx.createOscillator();
+    const g = ctx.createGain();
+    o.type = 'sine';
+    o.frequency.value = tones[idx] || 440;
+    g.gain.value = 0.0001;
+    o.connect(g); g.connect(ctx.destination);
+    o.start();
+    const t = ctx.currentTime;
+    g.gain.exponentialRampToValueAtTime(vol, t + 0.01);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur / 1000);
+    o.stop(t + dur / 1000 + 0.02);
+  }
+
+  function setPadsDisabled(disabled) {
+    pads.forEach(p => p.classList.toggle('disabled', disabled));
+  }
+
+  function lightPad(idx, dur = 500) {
+    const el = document.getElementById('p' + idx);
+    if (!el) return;
+    el.classList.add('lit');
+    beep(idx, dur);
+    setTimeout(() => el.classList.remove('lit'), Math.max(150, dur - 60));
+  }
+
+  function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+  async function playback() {
+    acceptingInput = false;
+    setPadsDisabled(true);
+    const mySession = sessionId;
+    msgEl.textContent = 'Watch the sequence.';
+    // Speed up slightly as sequence grows
+    const base = 520;
+    const stepDur = Math.max(250, base - sequence.length * 12);
+    await sleep(500);
+    for (let i = 0; i < sequence.length; i++) {
+      if (mySession !== sessionId) return; // cancelled
+      lightPad(sequence[i], stepDur);
+      await sleep(stepDur + 140);
+    }
+    if (mySession !== sessionId) return;
+    stepIndex = 0;
+    acceptingInput = true;
+    setPadsDisabled(false);
+    msgEl.textContent = 'Your turn.';
+  }
+
+  function updateRound() {
+    roundEl.textContent = String(sequence.length);
+  }
+  function updateScore() {
+    scoreEl.textContent = String(best);
+  }
+
+  function addRandomStep() {
+    sequence.push(Math.floor(Math.random() * 4));
+    updateRound();
+  }
+
+  function resetGame(keepBest = false) {
+    sessionId++;
+    sequence = [];
+    stepIndex = 0;
+    acceptingInput = false;
+    if (!keepBest) best = 0;
+    updateRound(); updateScore();
+    setPadsDisabled(true);
+    msgEl.textContent = 'Press Restart to begin.';
+  }
+
+  async function startGame() {
+    sessionId++; // cancel any pending playback
+    stepIndex = 0;
+    sequence = [];
+    updateRound();
+    setPadsDisabled(true);
+    msgEl.textContent = 'Get ready.';
+    await sleep(300);
+    addRandomStep();
+    await playback();
+  }
+
+  async function handleWrong() {
+    acceptingInput = false;
+    setPadsDisabled(true);
+    msgEl.textContent = strictChk.checked ? 'Wrong. Strict mode: restarting.' : 'Wrong. Watch again.';
+    // brief error tone and flash all pads
+    pads.forEach(p => p.classList.add('lit'));
+    if (ctx) {
+      const o = ctx.createOscillator(), g = ctx.createGain();
+      o.type = 'sawtooth'; o.frequency.value = 110;
+      g.gain.value = 0.0001; o.connect(g); g.connect(ctx.destination);
+      const t = ctx.currentTime;
+      o.start();
+      g.gain.exponentialRampToValueAtTime(0.25, t + 0.01);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + 0.35);
+      o.stop(t + 0.4);
+    }
+    await sleep(380);
+    pads.forEach(p => p.classList.remove('lit'));
+
+    if (strictChk.checked) {
+      await startGame();
+    } else {
+      await playback();
+    }
+  }
+
+  async function handlePadPress(idx) {
+    if (!acceptingInput) return;
+    // immediate tactile light
+    lightPad(idx, 260);
+
+    const expected = sequence[stepIndex];
+    if (idx !== expected) {
+      return handleWrong();
+    }
+
+    stepIndex++;
+    if (stepIndex === sequence.length) {
+      // Completed round
+      best = Math.max(best, sequence.length);
+      updateScore();
+      acceptingInput = false;
+      setPadsDisabled(true);
+      msgEl.textContent = 'Nice. Next round.';
+      await sleep(420);
+      addRandomStep();
+      await playback();
+    }
+  }
+
+  // Events
+  pads.forEach(p => {
+    p.addEventListener('click', e => handlePadPress(Number(p.dataset.id)));
+    // Optional keyboard focus feedback
+    p.addEventListener('keydown', e => {
+      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handlePadPress(Number(p.dataset.id)); }
+    });
+  });
+
+  restartBtn.addEventListener('click', () => startGame());
+
+  // Init
+  resetGame(false);
+})();
+</script>
+</body>
+</html>
