@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>Simon Says</title>
+<title>Simon Says — Strict</title>
 <style>
   :root{
     --bg:#0f172a; --ink:#e5e7eb; --muted:#94a3b8; --accent:#22d3ee;
@@ -13,7 +13,7 @@
   *{box-sizing:border-box}
   body{
     margin:0; min-height:100svh; display:grid; place-items:center;
-    font:500 16px/1.4 system-ui, -apple-system, Segoe UI, Roboto, Inter, Arial, sans-serif;
+    font:500 16px/1.4 system-ui,-apple-system,Segoe UI,Roboto,Inter,Arial,sans-serif;
     background:radial-gradient(1200px 900px at 50% -20%, #1f2937 0%, #0b1020 55%, #060913 100%);
     color:var(--ink); padding:24px;
   }
@@ -57,21 +57,16 @@
     cursor:pointer; box-shadow:0 10px 18px rgba(2,132,199,.35); transition:transform .08s ease, filter .08s ease;
   }
   .btn:active{transform:translateY(1px)}
-  .toggle{
-    display:inline-flex; align-items:center; gap:8px; background:#0b1224; padding:8px 10px; border-radius:12px;
-  }
-  input[type="checkbox"]{width:18px; height:18px; accent-color:var(--accent); cursor:pointer}
   .msg{margin-top:10px; color:var(--muted); min-height:20px}
 </style>
 </head>
 <body>
   <div class="wrap">
-    <h1>Simon Says</h1>
+    <h1>Simon Says (Strict)</h1>
 
     <div class="hud">
       <div class="left">
         <button id="restart" class="btn">Restart</button>
-        <label class="toggle"><input id="strict" type="checkbox" /> Strict mode</label>
       </div>
       <div class="right">
         <div class="stat"><small>Round</small><span id="round">0</span></div>
@@ -86,31 +81,26 @@
       <button class="pad b" id="p3" data-id="3" aria-label="Blue"></button>
     </div>
 
-    <div class="msg" id="msg">Press Restart to begin.</div>
+    <div class="msg" id="msg">Press Restart to begin. Strict mode is always on.</div>
   </div>
 
 <script>
 (() => {
-  // Elements
   const pads = [...document.querySelectorAll('.pad')];
-  const board = document.getElementById('board');
   const restartBtn = document.getElementById('restart');
-  const strictChk = document.getElementById('strict');
   const roundEl = document.getElementById('round');
   const scoreEl = document.getElementById('score');
   const msgEl = document.getElementById('msg');
 
-  // Game state
   let sequence = [];
   let stepIndex = 0;
   let acceptingInput = false;
-  let sessionId = 0; // cancels pending playback when incremented
+  let sessionId = 0;
   let best = 0;
 
-  // Audio (simple WebAudio beeps)
   const AC = window.AudioContext || window.webkitAudioContext;
   const ctx = AC ? new AC() : null;
-  const tones = [329.63, 261.63, 220.00, 196.00]; // E4, C4, A3, G3
+  const tones = [329.63, 261.63, 220.00, 196.00];
 
   function beep(idx, dur = 420, vol = 0.2) {
     if (!ctx) return;
@@ -126,32 +116,26 @@
     g.gain.exponentialRampToValueAtTime(0.0001, t + dur / 1000);
     o.stop(t + dur / 1000 + 0.02);
   }
-
-  function setPadsDisabled(disabled) {
-    pads.forEach(p => p.classList.toggle('disabled', disabled));
-  }
-
-  function lightPad(idx, dur = 500) {
+  function setPadsDisabled(disabled){ pads.forEach(p => p.classList.toggle('disabled', disabled)); }
+  function lightPad(idx, dur = 500){
     const el = document.getElementById('p' + idx);
     if (!el) return;
     el.classList.add('lit');
     beep(idx, dur);
     setTimeout(() => el.classList.remove('lit'), Math.max(150, dur - 60));
   }
+  const sleep = ms => new Promise(r => setTimeout(r, ms));
 
-  function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
-
-  async function playback() {
+  async function playback(){
     acceptingInput = false;
     setPadsDisabled(true);
     const mySession = sessionId;
     msgEl.textContent = 'Watch the sequence.';
-    // Speed up slightly as sequence grows
     const base = 520;
     const stepDur = Math.max(250, base - sequence.length * 12);
     await sleep(500);
-    for (let i = 0; i < sequence.length; i++) {
-      if (mySession !== sessionId) return; // cancelled
+    for (let i = 0; i < sequence.length; i++){
+      if (mySession !== sessionId) return;
       lightPad(sequence[i], stepDur);
       await sleep(stepDur + 140);
     }
@@ -162,19 +146,11 @@
     msgEl.textContent = 'Your turn.';
   }
 
-  function updateRound() {
-    roundEl.textContent = String(sequence.length);
-  }
-  function updateScore() {
-    scoreEl.textContent = String(best);
-  }
+  function updateRound(){ roundEl.textContent = String(sequence.length); }
+  function updateScore(){ scoreEl.textContent = String(best); }
+  function addRandomStep(){ sequence.push(Math.floor(Math.random() * 4)); updateRound(); }
 
-  function addRandomStep() {
-    sequence.push(Math.floor(Math.random() * 4));
-    updateRound();
-  }
-
-  function resetGame(keepBest = false) {
+  function resetGame(keepBest = false){
     sessionId++;
     sequence = [];
     stepIndex = 0;
@@ -182,11 +158,11 @@
     if (!keepBest) best = 0;
     updateRound(); updateScore();
     setPadsDisabled(true);
-    msgEl.textContent = 'Press Restart to begin.';
+    msgEl.textContent = 'Press Restart to begin. Strict mode is always on.';
   }
 
-  async function startGame() {
-    sessionId++; // cancel any pending playback
+  async function startGame(){
+    sessionId++;
     stepIndex = 0;
     sequence = [];
     updateRound();
@@ -197,13 +173,12 @@
     await playback();
   }
 
-  async function handleWrong() {
+  async function handleWrong(){
     acceptingInput = false;
     setPadsDisabled(true);
-    msgEl.textContent = strictChk.checked ? 'Wrong. Strict mode: restarting.' : 'Wrong. Watch again.';
-    // brief error tone and flash all pads
+    msgEl.textContent = 'Wrong. Restarting.';
     pads.forEach(p => p.classList.add('lit'));
-    if (ctx) {
+    if (ctx){
       const o = ctx.createOscillator(), g = ctx.createGain();
       o.type = 'sawtooth'; o.frequency.value = 110;
       g.gain.value = 0.0001; o.connect(g); g.connect(ctx.destination);
@@ -215,27 +190,16 @@
     }
     await sleep(380);
     pads.forEach(p => p.classList.remove('lit'));
-
-    if (strictChk.checked) {
-      await startGame();
-    } else {
-      await playback();
-    }
+    await startGame(); // strict always
   }
 
-  async function handlePadPress(idx) {
+  async function handlePadPress(idx){
     if (!acceptingInput) return;
-    // immediate tactile light
     lightPad(idx, 260);
-
     const expected = sequence[stepIndex];
-    if (idx !== expected) {
-      return handleWrong();
-    }
-
+    if (idx !== expected) return handleWrong();
     stepIndex++;
-    if (stepIndex === sequence.length) {
-      // Completed round
+    if (stepIndex === sequence.length){
       best = Math.max(best, sequence.length);
       updateScore();
       acceptingInput = false;
@@ -247,18 +211,14 @@
     }
   }
 
-  // Events
   pads.forEach(p => {
-    p.addEventListener('click', e => handlePadPress(Number(p.dataset.id)));
-    // Optional keyboard focus feedback
+    p.addEventListener('click', () => handlePadPress(Number(p.dataset.id)));
     p.addEventListener('keydown', e => {
-      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handlePadPress(Number(p.dataset.id)); }
+      if (e.key === 'Enter' || e.key === ' '){ e.preventDefault(); handlePadPress(Number(p.dataset.id)); }
     });
   });
+  document.getElementById('restart').addEventListener('click', startGame);
 
-  restartBtn.addEventListener('click', () => startGame());
-
-  // Init
   resetGame(false);
 })();
 </script>
